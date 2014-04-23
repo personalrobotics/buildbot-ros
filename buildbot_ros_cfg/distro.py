@@ -35,8 +35,6 @@ class RosDistroOracle:
 
             # compute dependency of each package
             for pkg in packages:
-                if dist.repositories[dist.release_packages[pkg].repository_name].release_repository.version == None:
-                    continue
                 pkg_depends[pkg] = list()
                 depends = walker.get_depends(pkg, 'buildtool')
                 depends |= walker.get_depends(pkg, 'build')
@@ -122,7 +120,10 @@ class RosDistroOracle:
 
     ## @brief Get the job to start nightly build with
     def getNightlyDocStart(self, dist_name):
-        return self.build_order[dist_name]['doc_jobs'][0]
+        if self.build_order[dist_name]['doc_jobs']:
+            return self.build_order[dist_name]['doc_jobs'][0]
+        else:
+            return None
 
     ## @brief Get the rosdistro.Index
     def getIndex(self):
@@ -138,6 +139,11 @@ class RosDistroOracle:
     ## @param distro The Ubuntu distro, 'precise'
     def getOtherMirror(self, build, rosdistro, distro):
         build_file = self.build_files[rosdistro][build]
+        if '_config' not in build_file._targets:
+            return []
+        elif 'apt_mirrors' not in build_file._targets['_config']:
+            return []
+
         #TODO: source, doc should be updated to allow this:
         #mirrors = build_file.get_target_configuration()['apt_mirrors']
         mirrors = build_file._targets['_config']['apt_mirrors']
@@ -151,6 +157,11 @@ class RosDistroOracle:
         build_file = self.build_files[rosdistro][build]
         #TODO: source, doc should be updated to allow this:
         #mirrors = build_file.get_target_configuration()['apt_mirrors']
+        if '_config' not in build_file._targets:
+            return []
+        elif 'apt_mirrors' not in build_file._targets['_config']:
+            return []
+
         mirrors = build_file._targets['_config']['apt_mirrors']
         return ' '.join([m[7:m.find(' ')] for m in mirrors if m.startswith('file://')])
 
@@ -158,6 +169,11 @@ class RosDistroOracle:
     ## @param build The type of the build, 'release', 'source', or 'doc'
     def getKeys(self, build, rosdistro):
         build_file = self.build_files[rosdistro][build]
+        if '_config' not in build_file._targets:
+            return []
+        elif 'apt_keys' not in build_file._targets['_config']:
+            return []
+
         #TODO: source, doc should be updated to allow this:
         #return build_file.get_target_configuration()['apt_keys']
         return build_file._targets['_config']['apt_keys']
