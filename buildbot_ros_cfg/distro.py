@@ -8,10 +8,13 @@ from buildbot_ros_cfg.ros_deb import ros_debbuild
 from buildbot_ros_cfg.ros_test import ros_testbuild
 from buildbot_ros_cfg.ros_doc import ros_docbuild
 
+# Disable the Github manifest provider since it throws an exception for
+# non-Github URLs.
+from rosdistro.manifest_provider.git import git_manifest_provider
+rosdistro.default_manifest_providers = [ git_manifest_provider ]
+
 ## @brief The Oracle tells you all you need to build stuff
 class RosDistroOracle:
-    # TODO: use release file blacklist and drop those packages.
-
     ## @brief Constructor
     ## @param index A rosdistro.Index instance
     ## @param distros A list of ROS distribution names
@@ -24,8 +27,11 @@ class RosDistroOracle:
         self.build_files = {}
 
         for dist_name in distro_names:
-            self.distributions[dist_name] = get_cached_distribution(index, dist_name, allow_lazy_load = True)
-            dist = self.distributions[dist_name]
+            dist = get_cached_distribution(index, dist_name, allow_lazy_load=True)
+            dist._manifest_providers = [ git_manifest_provider ]
+            self.distributions[dist_name]  = dist
+
+            print( dist.get_release_package_xml('owd_msgs') )
 
             self.build_order[dist_name] = dict()
 
@@ -36,9 +42,15 @@ class RosDistroOracle:
             # compute dependency of each package
             for pkg in packages:
                 pkg_depends[pkg] = list()
-                depends = walker.get_depends(pkg, 'buildtool')
-                depends |= walker.get_depends(pkg, 'build')
-                depends |= walker.get_depends(pkg, 'run')
+
+                try:
+                    depends = walker.get_depends(pkg, 'buildtool')
+                    depends |= walker.get_depends(pkg, 'build')
+                    depends |= walker.get_depends(pkg, 'run')
+                except Exception as e:
+                    print("WARNING: Failed loading package '{:s}': {:s}".format(pkg, e))
+                    continue
+
                 for dp in depends:
                     if dp in packages:
                         pkg_depends[pkg].append(dp)
@@ -116,7 +128,10 @@ class RosDistroOracle:
 
     ## @brief Get the job to start nightly build with
     def getNightlyDebStart(self, dist_name):
-        return self.build_order[dist_name]['deb_jobs'][0]
+        if self.build_order[dist_name]['deb_jobs']:
+            return self.build_order[dist_name]['deb_jobs'][0]
+        else:
+            return None
 
     ## @brief Get the job to start nightly build with
     def getNightlyDocStart(self, dist_name):

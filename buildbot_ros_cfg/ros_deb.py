@@ -118,6 +118,8 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
             )
         )
         # Upload binarydeb to master
+	# TODO: Decide where to put the package depending upon whether it is
+	# public or private.
         f.addStep(
             FileUpload(
                 name = package+'-uploadbinary',
@@ -130,7 +132,7 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
         f.addStep(
             MasterShellCommand(
                 name = package+'includedeb',
-                command = ['reprepro-include.bash', debian_pkg, Interpolate(final_name), distro, arch],
+                command = ['./scripts/aptly-include.py', debian_pkg, Interpolate(final_name), distro, arch ],
                 descriptionDone = ['updated in apt', package]
             )
         )

@@ -1,0 +1,17 @@
+*.pyc
+*.swp
+*_debbuild/
+*_testbuild/
+*_gitpoller-work/
+rosdistro/
+empty_build/
+public_html/
+sourcedebs/
+binarydebs/
+config.yaml
+state.sqlite
+twistd.log
+http.log
+twistd.pid
+buildbot.tac
+master.cfg.sample
