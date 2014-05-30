@@ -155,9 +155,9 @@ class RosDistroOracle:
     def getOtherMirror(self, build, rosdistro, distro):
         build_file = self.build_files[rosdistro][build]
         if '_config' not in build_file._targets:
-            return []
+            return ''
         elif 'apt_mirrors' not in build_file._targets['_config']:
-            return []
+            return ''
 
         #TODO: source, doc should be updated to allow this:
         #mirrors = build_file.get_target_configuration()['apt_mirrors']
@@ -173,9 +173,9 @@ class RosDistroOracle:
         #TODO: source, doc should be updated to allow this:
         #mirrors = build_file.get_target_configuration()['apt_mirrors']
         if '_config' not in build_file._targets:
-            return []
+            return ''
         elif 'apt_mirrors' not in build_file._targets['_config']:
-            return []
+            return ''
 
         mirrors = build_file._targets['_config']['apt_mirrors']
         return ' '.join([m[7:m.find(' ')] for m in mirrors if m.startswith('file://')])
