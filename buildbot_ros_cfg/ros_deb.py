@@ -6,6 +6,7 @@ from buildbot.steps.shell import ShellCommand, SetPropertyFromCommand
 from buildbot.steps.transfer import FileUpload, FileDownload
 from buildbot.steps.trigger import Trigger
 from buildbot.steps.master import MasterShellCommand
+from buildbot.steps.slave import RemoveDirectory
 from buildbot.schedulers import triggerable
 
 from helpers import success
@@ -27,6 +28,14 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
     gbp_args = ['-uc', '-us', '--git-ignore-branch', '--git-ignore-new',
                 '--git-verbose', '--git-dist='+distro, '--git-arch='+arch]
     f = BuildFactory()
+    # Remove the build directory.
+    f.addStep(
+        RemoveDirectory(
+            name = job_name+'-clean',
+            dir = Interpolate('%(prop:workdir)s'),
+            hideStepIf = success,
+        )
+    )
     # Check out the repository master branch, since releases are tagged and not branched
     f.addStep(
         Git(
@@ -45,7 +54,13 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
     )
     # Need to build each package in order
     for package in packages:
-        debian_pkg = 'ros-'+rosdistro+'-'+package.replace('_','-')  # debian package name (ros-groovy-foo)
+        # TODO: Automatically determine if this is a third-party package.
+        is_catkin = package not in [ 'boost_numpy', 'boost_numpy_eigen', 'openrave' ]
+        if is_catkin:
+            debian_pkg = 'ros-' + rosdistro + '-' + package.replace('_','-')
+        else:
+            debian_pkg = package.replace('_','-')
+
         branch_name = 'debian/'+debian_pkg+'_%(prop:release_version)s_'+distro  # release branch from bloom
         deb_name = debian_pkg+'_%(prop:release_version)s'+distro
         final_name = debian_pkg+'_%(prop:release_version)s-%(prop:datestamp)s'+distro+'_'+arch+'.deb'
@@ -128,14 +143,23 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
                 hideStepIf = success
             )
         )
-        # Add the binarydeb using reprepro updater script on master
+        # Add the packages using reprepro updater script on master
         f.addStep(
             MasterShellCommand(
-                name = package+'includedeb',
-                command = ['./scripts/aptly-include.sh', debian_pkg, Interpolate(final_name), distro, arch ],
-                descriptionDone = ['updated in apt', package]
+                name = package+'-includedeb',
+                command = ['./scripts/aptly-include.sh', debian_pkg, Interpolate('binarydebs/'+final_name), distro, arch ],
+                descriptionDone = ['updated deb in apt', package]
             )
         )
+        f.addStep(
+            MasterShellCommand(
+                name = package+'-includedsc',
+                command = ['./scripts/aptly-include.sh', debian_pkg, Interpolate('sourcedebs/'+deb_name+'.dsc'), distro, arch ],
+                descriptionDone = ['updated dsc in apt', package]
+            )
+        )
+
+    """
     # Trigger if needed
     if trigger_pkgs != None:
         f.addStep(
@@ -145,6 +169,10 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
                 alwaysRun=True
             )
         )
+    """
+
+    # Trigger if needed
+
     # Create trigger
     c['schedulers'].append(
         triggerable.Triggerable(
