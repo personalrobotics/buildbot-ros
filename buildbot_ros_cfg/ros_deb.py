@@ -63,6 +63,7 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
 
         branch_name = 'debian/'+debian_pkg+'_%(prop:release_version)s_'+distro  # release branch from bloom
         deb_name = debian_pkg+'_%(prop:release_version)s'+distro
+
         final_name = debian_pkg+'_%(prop:release_version)s-%(prop:datestamp)s'+distro+'_'+arch+'.deb'
         # Check out the proper tag. Use --force to delete changes from previous deb stamping
         f.addStep(
@@ -82,13 +83,32 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
                 descriptionDone = ['sourcedeb', package]
             )
         )
-        # Upload sourcedeb to master (currently we are not actually syncing these with a public repo)
+        # Upload sourcedeb to master.
+        dsc_name = debian_pkg+'_%(prop:partial_version)s'
         f.addStep(
             FileUpload(
-                name = package+'-uploadsource',
+                name = package+'-uploadsource-orig',
+                slavesrc = Interpolate('%(prop:workdir)s/'+dsc_name+'.orig.tar.gz'),
+                masterdest = Interpolate('sourcedebs/'+dsc_name+'.orig.tar.gz'),
+                hideStepIf = success,
+                mode = 0644,
+            )
+        )
+        f.addStep(
+            FileUpload(
+                name = package+'-uploadsource-tar',
+                slavesrc = Interpolate('%(prop:workdir)s/'+deb_name+'.debian.tar.gz'),
+                masterdest = Interpolate('sourcedebs/'+deb_name+'.debian.tar.gz'),
+                hideStepIf = success,
+                mode = 0644,
+            )
+        )
+        f.addStep(
+            FileUpload(
+                name = package+'-uploadsource-dsc',
                 slavesrc = Interpolate('%(prop:workdir)s/'+deb_name+'.dsc'),
                 masterdest = Interpolate('sourcedebs/'+deb_name+'.dsc'),
-                hideStepIf = success
+                mode = 0644,
             )
         )
         # Stamp the changelog, in a similar fashion to the ROS buildfarm
@@ -140,25 +160,27 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
                 name = package+'-uploadbinary',
                 slavesrc = Interpolate('%(prop:workdir)s/'+final_name),
                 masterdest = Interpolate('binarydebs/'+final_name),
-                hideStepIf = success
+                hideStepIf = success,
+                mode = 0644,
             )
         )
         # Add the packages using reprepro updater script on master
         f.addStep(
             MasterShellCommand(
                 name = package+'-includedeb',
-                command = ['./scripts/aptly-include.sh', debian_pkg, Interpolate('binarydebs/'+final_name), distro, arch ],
+                command = ['./scripts/aptly-include.sh', debian_pkg,
+                           Interpolate('binarydebs/'+final_name), distro, arch ],
                 descriptionDone = ['updated deb in apt', package]
             )
         )
         f.addStep(
             MasterShellCommand(
                 name = package+'-includedsc',
-                command = ['./scripts/aptly-include.sh', debian_pkg, Interpolate('sourcedebs/'+deb_name+'.dsc'), distro, arch ],
+                command = ['./scripts/aptly-include.sh', debian_pkg,
+                           Interpolate('sourcedebs/'+deb_name+'.dsc'), distro, arch ],
                 descriptionDone = ['updated dsc in apt', package]
             )
         )
-
     """
     # Trigger if needed
     if trigger_pkgs != None:
@@ -170,9 +192,6 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
             )
         )
     """
-
-    # Trigger if needed
-
     # Create trigger
     c['schedulers'].append(
         triggerable.Triggerable(
@@ -181,10 +200,12 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
         )
     )
     # Add to builders
+    partial_version, _, _ = version.partition('-')
     c['builders'].append(
         BuilderConfig(
             name = job_name+'_'+rosdistro+'_'+distro+'_'+arch+'_debbuild',
-            properties = {'release_version' : version},
+            properties = {'release_version' : version,
+                          'partial_version' : partial_version,},
             slavenames = machines,
             factory = f
         )
