@@ -5,6 +5,5 @@ distro="$3"
 architecture="$4"
 repository="private"
 
-chmod a+r "${deb_path}"
 sudo -Hu www-data -- /var/www/packages/aptly-add-package.bash "${repository}" "${distro}" "${deb_path}"
 rm "${deb_path}"
