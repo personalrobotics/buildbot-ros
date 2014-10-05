@@ -49,7 +49,10 @@ def ros_debbuild(c, job_name, packages, url, distro, arch, rosdistro, version, m
     f.addStep(
         ShellCommand(
             command = ['cowbuilder-update.py', distro, arch] + keys,
-            hideStepIf = success
+            hideStepIf = success,
+            # TODO: We shouldn't have to explicitly specify this. This path is
+            # already exported in the slave's .profile file.
+            env = { 'PATH': [ '/home/buildbot_slave/buildbot-ros/scripts': '${PATH}' ] },
         )
     )
     # Need to build each package in order
